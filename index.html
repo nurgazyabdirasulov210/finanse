@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0a0a" />
+<title>Финансы</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236366f1'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-size='36' font-family='Arial' fill='white' font-weight='700'%3E₽%3C/text%3E%3C/svg%3E" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --bg-elev: #131316;
+  --bg-elev-2: #1c1c1f;
+  --bg-soft: #1a1a1d;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text: #fafafa;
+  --text-soft: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #818cf8;
+  --accent-strong: #6366f1;
+  --accent-soft: rgba(129, 140, 248, 0.12);
+  --income: #34d399;
+  --income-soft: rgba(52, 211, 153, 0.12);
+  --expense: #f87171;
+  --expense-soft: rgba(248, 113, 113, 0.12);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+[data-theme="light"] {
+  --bg: #fafafa;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f4f4f5;
+  --bg-soft: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #18181b;
+  --text-soft: #52525b;
+  --text-muted: #a1a1aa;
+  --accent: #6366f1;
+  --accent-strong: #4f46e5;
+  --accent-soft: rgba(99, 102, 241, 0.08);
+  --income: #059669;
+  --income-soft: rgba(5, 150, 105, 0.08);
+  --expense: #dc2626;
+  --expense-soft: rgba(220, 38, 38, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+  overflow-x: hidden;
+  transition: background 0.2s, color 0.2s;
+}
+button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; padding: 0; }
+input, select, textarea { font: inherit; color: inherit; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+// =====================================================================
+// ДАННЫЕ
+// =====================================================================
+
+const CURRENCIES = [
+  { code: 'RUB', name: 'Российский рубль',     sym: '₽'  },
+  { code: 'KZT', name: 'Казахстанский тенге',  sym: '₸'  },
+  { code: 'USD', name: 'Доллар США',           sym: '$'  },
+  { code: 'EUR', name: 'Евро',                 sym: '€'  },
+  { code: 'GBP', name: 'Британский фунт',      sym: '£'  },
+  { code: 'CNY', name: 'Китайский юань',       sym: '¥'  },
+  { code: 'JPY', name: 'Японская иена',        sym: '¥'  },
+  { code: 'KRW', name: 'Южнокорейская вона',   sym: '₩'  },
+  { code: 'UAH', name: 'Украинская гривна',    sym: '₴'  },
+  { code: 'BYN', name: 'Белорусский рубль',    sym: 'Br' },
+  { code: 'UZS', name: 'Узбекский сум',        sym: 'сўм'},
+  { code: 'AED', name: 'Дирхам ОАЭ',           sym: 'د.إ'},
+  { code: 'TRY', name: 'Турецкая лира',        sym: '₺'  },
+  { code: 'CHF', name: 'Швейцарский франк',    sym: 'Fr' },
+  { code: 'INR', name: 'Индийская рупия',      sym: '₹'  },
+];
+
+const DEFAULT_CATEGORIES = [
+  { id: 'food',       name: 'Еда',         emoji: '🍔', type: 'expense' },
+  { id: 'transport',  name: 'Транспорт',   emoji: '🚗', type: 'expense' },
+  { id: 'home',       name: 'Жильё',       emoji: '🏠', type: 'expense' },
+  { id: 'health',     name: 'Здоровье',    emoji: '💊', type: 'expense' },
+  { id: 'fun',        name: 'Развлечения', emoji: '🎬', type: 'expense' },
+  { id: 'shopping',   name: 'Покупки',     emoji: '🛍️', type: 'expense' },
+  { id: 'bills',      name: 'Счета',       emoji: '📃', type: 'expense' },
+  { id: 'education',  name: 'Обучение',    emoji: '📚', type: 'expense' },
+  { id: 'travel',     name: 'Путешествия', emoji: '✈️', type: 'expense' },
+  { id: 'other_exp',  name: 'Другое',      emoji: '📦', type: 'expense' },
+  { id: 'salary',     name: 'Зарплата',    emoji: '💼', type: 'income'  },
+  { id: 'gift',       name: 'Подарки',     emoji: '🎁', type: 'income'  },
+  { id: 'freelance',  name: 'Подработка',  emoji: '💻', type: 'income'  },
+  { id: 'invest',     name: 'Инвестиции',  emoji: '📈', type: 'income'  },
+  { id: 'other_inc',  name: 'Другое',      emoji: '💵', type: 'income'  },
+];
+
+// =====================================================================
+// УТИЛЫ
+// =====================================================================
+
+const $ = (s, el = document) => el.querySelector(s);
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fmt = (n) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n || 0);
+const cur = (code) => CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
+const getAllCats = (custom) => [...DEFAULT_CATEGORIES, ...custom];
+const getCatsByType = (custom, t) => getAllCats(custom).filter(c => c.type === t);
+const findCat = (custom, id) => getAllCats(custom).find(c => c.id === id);
+const detectCurrency = () => {
+  try {
+    const l = (navigator.language || 'ru-RU').toLowerCase();
+    if (l.startsWith('ru')) return 'RUB';
+    if (l.startsWith('kk')) return 'KZT';
+    if (l.startsWith('uk')) return 'UAH';
+    if (l.startsWith('en-us') || l === 'en') return 'USD';
+    if (l.startsWith('de') || l.startsWith('fr') || l.startsWith('es') || l.startsWith('it')) return 'EUR';
+  } catch(e) {}
+  return 'RUB';
+};
+const detectTheme = () => {
+  try {
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+  } catch(e) {}
+  return 'dark'; // дефолт всегда тёмный по требованию
+};
+const formatDate = (d) => {
+  const dt = new Date(d);
+  const t = new Date();
+  if (dt.toDateString() === t.toDateString()) return 'Сегодня';
+  const y = new Date(t); y.setDate(t.getDate() - 1);
+  if (dt.toDateString() === y.toDateString()) return 'Вчера';
+  return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+};
+const formatDateLong = (d) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+const greetingByTime = () => {
+  const h = new Date().getHours();
+  if (h < 6) return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 18) return 'Добрый день';
+  return 'Добрый вечер';
+};
+
+// =====================================================================
+// ХРАНИЛИЩЕ
+// =====================================================================
+
+const LS = {
+  tx: 'finances_v2_tx',
+  cats: 'finances_v2_cats',
+  prefs: 'finances_v2_prefs',
+  users: 'finances_v2_users',
+  session: 'finances_v2_session',
+};
+
+const loadState = () => {
+  try {
+    return {
+      transactions: JSON.parse(localStorage.getItem(LS.tx) || '[]'),
+      customCategories: JSON.parse(localStorage.getItem(LS.cats) || '[]'),
+      currency: localStorage.getItem('finances_v2_currency') || detectCurrency(),
+      theme: localStorage.getItem('finances_v2_theme') || detectTheme(),
+    };
+  } catch(e) { return { transactions: [], customCategories: [], currency: 'RUB', theme: 'dark' }; }
+};
+const saveTx = (tx) => localStorage.setItem(LS.tx, JSON.stringify(tx));
+const saveCats = (cats) => localStorage.setItem(LS.cats, JSON.stringify(cats));
+const saveCurrency = (c) => localStorage.setItem('finances_v2_currency', c);
+const saveTheme = (t) => localStorage.setItem('finances_v2_theme', t);
+
+// =====================================================================
+// ИКОНКИ (inline SVG)
+// =====================================================================
+
+const Icon = ({ name, size = 20, stroke = 1.8, ...p }) => {
+  const paths = {
+    home: <><path d="M3 12L12 3l9 9M5 10v10a1 1 0 001 1h3v-6h6v6h3a1 1 0 001-1V10" /></>,
+    history: <><path d="M3 3v18h18M7 14l4-4 4 4 5-5" /></>,
+    stats: <><path d="M3 3v18h18M7 12l3-3 4 4 5-6" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" /></>,
+    plus: <><path d="M12 5v14M5 12h14" /></>,
+    close: <><path d="M18 6L6 18M6 6l12 12" /></>,
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></>,
+    moon: <><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></>,
+    arrowUp: <><path d="M12 19V5M5 12l7-7 7 7" /></>,
+    arrowDown: <><path d="M12 5v14M5 12l7 7 7-7" /></>,
+    arrowRight: <><path d="M5 12h14M12 5l7 7-7 7" /></>,
+    chevron: <><path d="M9 6l6 6-6 6" /></>,
+    currency: <><circle cx="12" cy="12" r="10" /><path d="M16 8h-6a2 2 0 100 4h4a2 2 0 110 4H8M12 6v2M12 16v2" /></>,
+    download: <><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></>,
+    user: <><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    google: <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" opacity="0" />,
+    trash: <><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /></>,
+    check: <><path d="M20 6L9 17l-5-5" /></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" {...p}>
+      {paths[name] || null}
+    </svg>
+  );
+};
+
+// =====================================================================
+// ОБЩИЕ КОМПОНЕНТЫ
+// =====================================================================
+
+const Sheet = ({ open, onClose, children, title, subtitle }) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      animation: 'fadeIn 0.18s ease',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--bg-elev)', width: '100%', maxWidth: 480, borderRadius: '20px 20px 0 0',
+        padding: '8px 20px calc(20px + env(safe-area-inset-bottom))', maxHeight: '90vh', overflowY: 'auto',
+        animation: 'slideUp 0.22s cubic-bezier(0.2,0.8,0.2,1)', borderTop: '1px solid var(--border)',
+      }}>
+        <div style={{ width: 36, height: 4, background: 'var(--border)', borderRadius: 2, margin: '6px auto 14px' }} />
+        {title && <h3 style={{ fontSize: 19, fontWeight: 600, margin: '0 0 4px', letterSpacing: '-0.3px' }}>{title}</h3>}
+        {subtitle && <p style={{ fontSize: 13, color: 'var(--text-soft)', margin: '0 0 18px' }}>{subtitle}</p>}
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const CenterModal = ({ open, onClose, children }) => {
+  if (!open) return null;
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      animation: 'fadeIn 0.18s ease',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: 'var(--bg-elev)', width: '100%', maxWidth: 380, borderRadius: 16,
+        padding: 24, border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+      }}>{children}</div>
+    </div>
+  );
+};
+
+const Btn = ({ children, variant = 'primary', onClick, disabled, style, type = 'button' }) => {
+  const styles = {
+    primary: { background: 'var(--accent-strong)', color: 'white' },
+    secondary: { background: 'var(--bg-elev-2)', color: 'var(--text)', border: '1px solid var(--border)' },
+    danger: { background: 'var(--expense-soft)', color: 'var(--expense)' },
+    ghost: { background: 'transparent', color: 'var(--text-soft)' },
+    google: { background: 'var(--bg-elev-2)', color: 'var(--text)', border: '1px solid var(--border-strong)' },
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled} style={{
+      ...styles[variant], padding: '12px 16px', borderRadius: 10, fontSize: 14, fontWeight: 500,
+      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      transition: 'all 0.15s', opacity: disabled ? 0.5 : 1,
+      ...style,
+    }}>{children}</button>
+  );
+};
+
+const Input = ({ label, ...p }) => (
+  <div style={{ marginBottom: 14 }}>
+    {label && <label style={{ display: 'block', fontSize: 12, color: 'var(--text-soft)', marginBottom: 6, fontWeight: 500 }}>{label}</label>}
+    <input {...p} style={{
+      width: '100%', background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+      borderRadius: 10, padding: '11px 12px', fontSize: 14, color: 'var(--text)',
+      outline: 'none', transition: 'border-color 0.15s', ...p.style,
+    }} />
+  </div>
+);
+
+const Segmented = ({ value, options, onChange }) => (
+  <div style={{
+    display: 'flex', background: 'var(--bg-elev-2)', borderRadius: 10, padding: 3, gap: 2,
+    border: '1px solid var(--border)',
+  }}>
+    {options.map(o => (
+      <button key={o.value} onClick={() => onChange(o.value)} style={{
+        flex: 1, padding: '8px 12px', borderRadius: 7, fontSize: 13, fontWeight: 500,
+        color: value === o.value ? 'var(--text)' : 'var(--text-soft)',
+        background: value === o.value ? 'var(--bg-elev)' : 'transparent',
+        boxShadow: value === o.value ? 'var(--shadow-sm)' : 'none',
+        transition: 'all 0.15s',
+      }}>{o.label}</button>
+    ))}
+  </div>
+);
+
+// =====================================================================
+// ГЛАВНОЕ ПРИЛОЖЕНИЕ
+// =====================================================================
+
+const App = () => {
+  const initial = loadState();
+  const [transactions, setTransactions] = useState(initial.transactions);
+  const [customCategories, setCustomCategories] = useState(initial.customCategories);
+  const [currency, setCurrency] = useState(initial.currency);
+  const [theme, setTheme] = useState(initial.theme);
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS.session) || 'null'); } catch(e) { return null; }
+  });
+  const [view, setView] = useState('home');
+  const [showAdd, setShowAdd] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showCurrency, setShowCurrency] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  // применяем тему
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  // сохраняем
+  useEffect(() => { saveTx(transactions); }, [transactions]);
+  useEffect(() => { saveCats(customCategories); }, [customCategories]);
+  useEffect(() => { saveCurrency(currency); }, [currency]);
+  useEffect(() => { saveTheme(theme); }, [theme]);
+
+  const showToast = useCallback((msg, type = '') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 2200);
+  }, []);
+
+  const addTx = (tx) => {
+    setTransactions(prev => [{ ...tx, id: uid(), createdAt: Date.now() }, ...prev]);
+    setShowAdd(false);
+    showToast(tx.type === 'expense' ? 'Расход добавлен' : 'Доход добавлен', 'success');
+  };
+  const deleteTx = (id) => {
+    if (!confirm('Удалить операцию?')) return;
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    setDetail(null);
+    showToast('Удалено');
+  };
+  const addCategory = (cat) => {
+    setCustomCategories(prev => [...prev, { ...cat, id: 'c_' + uid(), custom: true }]);
+    showToast('Категория добавлена', 'success');
+  };
+  const removeCategory = (id) => {
+    setCustomCategories(prev => prev.filter(c => c.id !== id));
+  };
+  const login = (u) => {
+    setUser(u);
+    localStorage.setItem(LS.session, JSON.stringify(u));
+    setShowAuth(false);
+    showToast('Вход выполнен', 'success');
+  };
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem(LS.session);
+    showToast('Вышли из аккаунта');
+  };
+
+  return (
+    <>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+      <div style={{ minHeight: '100vh', maxWidth: 480, margin: '0 auto', background: 'var(--bg)', position: 'relative', paddingBottom: 90 }}>
+        <Header user={user} theme={theme} setTheme={setTheme} view={view} setView={setView} />
+        <main style={{ padding: '0 16px' }}>
+          {view === 'home' && <HomeView transactions={transactions} currency={currency} onAdd={() => setShowAdd(true)} onDetail={setDetail} />}
+          {view === 'history' && <HistoryView transactions={transactions} currency={currency} onDetail={setDetail} />}
+          {view === 'stats' && <StatsView transactions={transactions} currency={currency} />}
+          {view === 'settings' && (
+            <SettingsView
+              user={user} theme={theme} setTheme={setTheme} currency={currency}
+              onCurrency={() => setShowCurrency(true)}
+              onTheme={() => setShowTheme(true)}
+              onCategories={() => setShowCategories(true)}
+              onLogin={() => setShowAuth(true)}
+              onLogout={logout}
+              onExport={() => exportCSV(transactions, customCategories, currency, showToast)}
+            />
+          )}
+        </main>
+        <BottomNav view={view} setView={setView} onAdd={() => setShowAdd(true)} />
+      </div>
+
+      <Sheet open={showAdd} onClose={() => setShowAdd(false)} title="Новая операция" subtitle="Запиши трату или доход">
+        <AddTransactionForm onSave={addTx} onClose={() => setShowAdd(false)} customCategories={customCategories} currency={currency} />
+      </Sheet>
+
+      <CenterModal open={showAuth} onClose={() => setShowAuth(false)}>
+        <AuthForm onLogin={login} />
+      </CenterModal>
+
+      <Sheet open={showCurrency} onClose={() => setShowCurrency(false)} title="Валюта" subtitle="Выбери основную">
+        <CurrencyList current={currency} onChange={(c) => { setCurrency(c); setShowCurrency(false); showToast('Валюта изменена', 'success'); }} />
+      </Sheet>
+
+      <CenterModal open={showTheme} onClose={() => setShowTheme(false)}>
+        <h3 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 4px' }}>Тема</h3>
+        <p style={{ fontSize: 13, color: 'var(--text-soft)', margin: '0 0 16px' }}>Выбери как удобнее</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {[
+            { v: 'light', l: 'Светлая', bg: '#fafafa', fg: '#18181b' },
+            { v: 'auto', l: 'Авто', bg: 'linear-gradient(90deg, #fafafa 50%, #0a0a0a 50%)', fg: '#71717a' },
+            { v: 'dark', l: 'Тёмная', bg: '#0a0a0a', fg: '#fafafa' },
+          ].map(o => (
+            <button key={o.v} onClick={() => { setTheme(o.v); setShowTheme(false); }} style={{
+              padding: 16, borderRadius: 10, border: theme === o.v ? '2px solid var(--accent)' : '1px solid var(--border)',
+              background: o.bg, color: o.fg, fontSize: 12, fontWeight: 500, transition: 'all 0.15s',
+            }}>{o.l}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 14 }}><Btn variant="secondary" onClick={() => setShowTheme(false)}>Готово</Btn></div>
+      </CenterModal>
+
+      <Sheet open={showCategories} onClose={() => setShowCategories(false)} title="Категории" subtitle="Свои можно удалять">
+        <CategoriesManager
+          custom={customCategories}
+          onAdd={addCategory}
+          onRemove={removeCategory}
+        />
+      </Sheet>
+
+      <CenterModal open={!!detail} onClose={() => setDetail(null)}>
+        {detail && <TransactionDetail tx={detail} custom={customCategories} currency={currency} onDelete={() => deleteTx(detail.id)} onClose={() => setDetail(null)} />}
+      </CenterModal>
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          background: toast.type === 'error' ? 'var(--expense)' : toast.type === 'success' ? 'var(--income)' : 'var(--text)',
+          color: toast.type ? 'white' : 'var(--bg)', padding: '10px 16px', borderRadius: 10, fontSize: 13, fontWeight: 500,
+          zIndex: 200, boxShadow: 'var(--shadow-lg)', animation: 'slideUp 0.2s ease',
+        }}>{toast.msg}</div>
+      )}
+    </>
+  );
+};
+
+// =====================================================================
+// HEADER
+// =====================================================================
+
+const Header = ({ user, theme, setTheme, view, setView }) => {
+  const initials = user ? (user.displayName || user.email || 'Г').trim().slice(0, 1).toUpperCase() : 'Г';
+  return (
+    <header style={{
+      padding: '16px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 50, borderBottom: '1px solid transparent',
+      transition: 'border-color 0.2s',
+    }}>
+      <div>
+        <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: 0, fontWeight: 500 }}>{greetingByTime()}</p>
+        <h1 style={{ fontSize: 19, fontWeight: 600, margin: '2px 0 0', letterSpacing: '-0.3px' }}>
+          {user && !user.isGuest ? (user.displayName || 'Пользователь') : 'Гость'}
+        </h1>
+      </div>
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} style={{
+          width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-soft)', transition: 'background 0.15s',
+        }} onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elev-2)'}
+           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+        </button>
+        <button onClick={() => setView('settings')} style={{
+          width: 32, height: 32, borderRadius: '50%', background: 'var(--accent)', color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600,
+          border: user && !user.isGuest ? 'none' : '2px solid var(--border-strong)',
+          background: user && !user.isGuest ? 'var(--accent)' : 'var(--bg-elev-2)',
+          color: user && !user.isGuest ? 'white' : 'var(--text-soft)',
+        }}>{initials}</button>
+      </div>
+    </header>
+  );
+};
+
+// =====================================================================
+// BOTTOM NAV
+// =====================================================================
+
+const BottomNav = ({ view, setView, onAdd }) => {
+  const items = [
+    { v: 'home', i: 'home', l: 'Главная' },
+    { v: 'history', i: 'history', l: 'История' },
+    null, // FAB
+    { v: 'stats', i: 'stats', l: 'Статистика' },
+    { v: 'settings', i: 'settings', l: 'Ещё' },
+  ];
+  return (
+    <nav style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
+      background: 'var(--bg-elev)', borderTop: '1px solid var(--border)',
+      display: 'flex', justifyContent: 'space-around', padding: '8px 0 calc(8px + env(safe-area-inset-bottom))',
+      zIndex: 50,
+    }}>
+      {items.map((it, idx) => {
+        if (it === null) {
+          return (
+            <button key="add" onClick={onAdd} style={{
+              width: 48, height: 48, borderRadius: '50%', background: 'var(--accent)', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: -16,
+              boxShadow: '0 4px 16px rgba(99, 102, 241, 0.4)', transition: 'transform 0.15s',
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.94)'}
+            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
+              <Icon name="plus" size={22} stroke={2.5} />
+            </button>
+          );
+        }
+        const active = view === it.v;
+        return (
+          <button key={it.v} onClick={() => setView(it.v)} style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            padding: '6px 0', color: active ? 'var(--text)' : 'var(--text-muted)', fontSize: 10, fontWeight: 500,
+            transition: 'color 0.15s',
+          }}>
+            <Icon name={it.i} size={20} stroke={active ? 2.2 : 1.7} />
+            {it.l}
+          </button>
+        );
+      })}
+    </nav>
+  );
+};
+
+// =====================================================================
+// ГЛАВНАЯ
+// =====================================================================
+
+const HomeView = ({ transactions, currency, onAdd, onDetail }) => {
+  const sym = cur(currency).sym;
+  const total = transactions.reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+  const monthPrefix = today().slice(0, 7);
+  const monthTx = transactions.filter(t => t.date.startsWith(monthPrefix));
+  const inc = monthTx.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const exp = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const recent = transactions.slice(0, 5);
+
+  return (
+    <>
+      {/* Баланс */}
+      <div style={{
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        borderRadius: 20, padding: 22, marginBottom: 18, color: 'white',
+        boxShadow: '0 8px 24px rgba(99, 102, 241, 0.25)', position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
+        <div style={{ position: 'absolute', bottom: -60, left: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+        <p style={{ fontSize: 12, opacity: 0.85, margin: 0, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.5 }}>Общий баланс</p>
+        <h2 style={{ fontSize: 36, fontWeight: 700, margin: '6px 0 0', letterSpacing: -1.5, wordBreak: 'break-all', lineHeight: 1.1 }}>
+          {fmt(total)} <span style={{ fontSize: 22, opacity: 0.8, fontWeight: 500 }}>{sym}</span>
+        </h2>
+        <div style={{ display: 'flex', gap: 0, marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.15)', position: 'relative' }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 10, opacity: 0.8, margin: 0, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>Доход за месяц</p>
+            <p style={{ fontSize: 16, fontWeight: 600, margin: '4px 0 0' }}>+{fmt(inc)} {sym}</p>
+          </div>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.15)', margin: '0 16px' }} />
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 10, opacity: 0.8, margin: 0, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>Расход за месяц</p>
+            <p style={{ fontSize: 16, fontWeight: 600, margin: '4px 0 0' }}>−{fmt(exp)} {sym}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Быстрые действия */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 22 }}>
+        <ActionCard label="Расход" sub="Куда ушли" onClick={() => onAdd('expense')} type="expense" />
+        <ActionCard label="Доход" sub="Откуда пришли" onClick={() => onAdd('income')} type="income" />
+      </div>
+
+      {/* Последние операции */}
+      <SectionHeader title="Последние операции" action={{ label: 'Все', onClick: () => document.querySelector('[data-nav=history]').click() }} />
+      {recent.length === 0 ? (
+        <EmptyState text="Пока пусто. Нажми + чтобы добавить первую операцию" />
+      ) : (
+        <TxList items={recent} currency={currency} onClick={onDetail} />
+      )}
+    </>
+  );
+};
+
+const ActionCard = ({ label, sub, onClick, type }) => (
+  <button onClick={onClick} style={{
+    background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 14,
+    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', transition: 'all 0.15s',
+  }}
+  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border-strong)'}
+  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}>
+    <div style={{
+      width: 40, height: 40, borderRadius: 10,
+      background: type === 'expense' ? 'var(--expense-soft)' : 'var(--income-soft)',
+      color: type === 'expense' ? 'var(--expense)' : 'var(--income)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Icon name={type === 'expense' ? 'arrowUp' : 'arrowDown'} size={20} stroke={2.2} />
+    </div>
+    <div>
+      <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: 'var(--text)' }}>{label}</p>
+      <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0' }}>{sub}</p>
+    </div>
+  </button>
+);
+
+const SectionHeader = ({ title, action }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+    <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: 0.5, margin: 0 }}>{title}</h3>
+    {action && <button onClick={action.onClick} style={{ fontSize: 12, color: 'var(--text-soft)', fontWeight: 500 }}>{action.label} →</button>}
+  </div>
+);
+
+const TxList = ({ items, currency, onClick }) => (
+  <div style={{
+    background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden',
+  }}>
+    {items.map((tx, i) => (
+      <TxItem key={tx.id} tx={tx} currency={currency} onClick={onClick} last={i === items.length - 1} />
+    ))}
+  </div>
+);
+
+const TxItem = ({ tx, currency, onClick, last = false }) => {
+  const cat = findCat([], tx.categoryId) || { name: 'Без категории', emoji: '❓' };
+  const sym = cur(currency).sym;
+  const sign = tx.type === 'expense' ? '−' : '+';
+  return (
+    <button onClick={() => onClick && onClick(tx)} style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', width: '100%', textAlign: 'left',
+      borderBottom: last ? 'none' : '1px solid var(--border)', transition: 'background 0.15s',
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elev-2)'}
+    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+      <div style={{
+        width: 38, height: 38, borderRadius: 10, fontSize: 18, flexShrink: 0,
+        background: tx.type === 'expense' ? 'var(--expense-soft)' : 'var(--income-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>{cat.emoji}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 14, fontWeight: 500, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</p>
+        <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0' }}>{formatDate(tx.date)}{tx.note ? ' · ' + tx.note : ''}</p>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', color: tx.type === 'expense' ? 'var(--expense)' : 'var(--income)' }}>
+        {sign}{fmt(tx.amount)} <span style={{ fontSize: 11, opacity: 0.7 }}>{sym}</span>
+      </div>
+    </button>
+  );
+};
+
+const EmptyState = ({ text }) => (
+  <div style={{
+    textAlign: 'center', padding: '40px 20px', color: 'var(--text-soft)',
+    border: '1px dashed var(--border)', borderRadius: 14, background: 'var(--bg-elev)',
+  }}>
+    <p style={{ margin: 0, fontSize: 13 }}>{text}</p>
+  </div>
+);
+
+// =====================================================================
+// ИСТОРИЯ
+// =====================================================================
+
+const HistoryView = ({ transactions, currency, onDetail }) => {
+  const [filter, setFilter] = useState('all');
+  let items = filter === 'all' ? transactions : transactions.filter(t => t.type === filter);
+  if (items.length === 0) return (
+    <>
+      <SectionHeader title="История" />
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {[['all', 'Все'], ['expense', 'Расходы'], ['income', 'Доходы']].map(([v, l]) => (
+          <FilterChip key={v} active={filter === v} onClick={() => setFilter(v)}>{l}</FilterChip>
+        ))}
+      </div>
+      <EmptyState text="Ничего не найдено" />
+    </>
+  );
+
+  // Группируем по дате
+  const groups = {};
+  items.forEach(t => { (groups[t.date] = groups[t.date] || []).push(t); });
+  const dates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <>
+      <SectionHeader title="История" />
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto' }}>
+        {[['all', 'Все'], ['expense', 'Расходы'], ['income', 'Доходы']].map(([v, l]) => (
+          <FilterChip key={v} active={filter === v} onClick={() => setFilter(v)}>{l}</FilterChip>
+        ))}
+      </div>
+      {dates.map(d => {
+        const dayTotal = groups[d].reduce((s, t) => s + (t.type === 'income' ? t.amount : -t.amount), 0);
+        const sign = dayTotal >= 0 ? '+' : '−';
+        return (
+          <div key={d} style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 4px 8px' }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{formatDate(d) === 'Сегодня' || formatDate(d) === 'Вчера' ? formatDate(d) : formatDateLong(d)}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: dayTotal >= 0 ? 'var(--income)' : 'var(--expense)' }}>{sign}{fmt(Math.abs(dayTotal))} {cur(currency).sym}</span>
+            </div>
+            <TxList items={groups[d]} currency={currency} onClick={onDetail} />
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+const FilterChip = ({ active, onClick, children }) => (
+  <button onClick={onClick} style={{
+    padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap',
+    background: active ? 'var(--text)' : 'transparent',
+    color: active ? 'var(--bg)' : 'var(--text-soft)',
+    border: '1px solid ' + (active ? 'var(--text)' : 'var(--border)'),
+    transition: 'all 0.15s',
+  }}>{children}</button>
+);
+
+// =====================================================================
+// СТАТИСТИКА
+// =====================================================================
+
+const StatsView = ({ transactions, currency }) => {
+  const [range, setRange] = useState('month');
+  const sym = cur(currency).sym;
+  const trendRef = useRef(null);
+  const catRef = useRef(null);
+  const trendChart = useRef(null);
+  const catChart = useRef(null);
+
+  const data = useMemo(() => {
+    const now = new Date();
+    let from = new Date(now);
+    if (range === 'week') from.setDate(now.getDate() - 6);
+    if (range === 'month') from.setDate(now.getDate() - 29);
+    if (range === 'year') from = new Date(now.getFullYear(), 0, 1);
+    const items = transactions.filter(t => new Date(t.date) >= from);
+    const inc = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const exp = items.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    return { items, inc, exp };
+  }, [transactions, range]);
+
+  useEffect(() => {
+    if (!trendRef.current) return;
+    if (trendChart.current) trendChart.current.destroy();
+    const now = new Date();
+    const labels = [], points = [];
+    if (range === 'year') {
+      for (let m = 0; m < 12; m++) {
+        const d = new Date(now.getFullYear(), m, 1);
+        const next = new Date(now.getFullYear(), m + 1, 1);
+        labels.push(d.toLocaleDateString('ru-RU', { month: 'short' }));
+        const total = data.items.filter(t => { const td = new Date(t.date); return td >= d && td < next; }).reduce((s, t) => s + (t.type === 'expense' ? -t.amount : t.amount), 0);
+        points.push(total);
+      }
+    } else {
+      const days = range === 'week' ? 7 : 30;
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        labels.push(d.getDate());
+        const ds = d.toISOString().slice(0, 10);
+        const total = data.items.filter(t => t.date === ds).reduce((s, t) => s + (t.type === 'expense' ? -t.amount : t.amount), 0);
+        points.push(total);
+      }
+    }
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const ctx = trendRef.current.getContext('2d');
+    trendChart.current = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ data: points, borderColor: isDark ? '#818cf8' : '#6366f1', backgroundColor: (c) => {
+        const g = c.chart.ctx.createLinearGradient(0, 0, 0, 200);
+        g.addColorStop(0, isDark ? 'rgba(129,140,248,0.2)' : 'rgba(99,102,241,0.1)');
+        g.addColorStop(1, 'rgba(99,102,241,0)');
+        return g;
+      }, borderWidth: 2, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: isDark ? '#131316' : '#fff', titleColor: isDark ? '#fafafa' : '#18181b',
+          bodyColor: isDark ? '#fafafa' : '#18181b', borderColor: isDark ? '#27272a' : '#e4e4e7',
+          borderWidth: 1, padding: 10, displayColors: false,
+          callbacks: { label: (c) => fmt(c.parsed.y) + ' ' + sym }
+        } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: isDark ? '#71717a' : '#a1a1aa', maxTicksLimit: 8, font: { size: 10 } }, border: { display: false } },
+          y: { grid: { color: isDark ? '#1c1c1f' : '#f4f4f5' }, ticks: { color: isDark ? '#71717a' : '#a1a1aa', font: { size: 10 }, callback: (v) => fmt(v) }, border: { display: false } }
+        }
+      }
+    });
+  }, [data, range, sym]);
+
+  useEffect(() => {
+    if (!catRef.current) return;
+    if (catChart.current) catChart.current.destroy();
+    const map = {};
+    data.items.filter(t => t.type === 'expense').forEach(t => { map[t.categoryId] = (map[t.categoryId] || 0) + t.amount; });
+    const entries = Object.entries(map).map(([id, v]) => ({ ...findCat([], id) || { name: '?', emoji: '❓' }, value: v })).sort((a, b) => b.value - a.value);
+    if (!entries.length) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const ctx = catRef.current.getContext('2d');
+    catChart.current = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: entries.map(e => e.name), datasets: [{ data: entries.map(e => e.value),
+        backgroundColor: isDark
+          ? ['#818cf8','#a78bfa','#f472b6','#fb7185','#fb923c','#facc15','#4ade80','#2dd4bf','#22d3ee','#60a5fa']
+          : ['#6366f1','#8b5cf6','#ec4899','#f43f5e','#f97316','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6'],
+        borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, padding: 8, font: { size: 11 }, color: isDark ? '#a1a1aa' : '#71717a' } } }
+      }
+    });
+  }, [data]);
+
+  const topExpenses = useMemo(() => {
+    const map = {};
+    data.items.filter(t => t.type === 'expense').forEach(t => { map[t.categoryId] = (map[t.categoryId] || 0) + t.amount; });
+    return Object.entries(map).map(([id, v]) => ({ ...findCat([], id) || { name: '?', emoji: '❓' }, value: v })).sort((a, b) => b.value - a.value).slice(0, 6);
+  }, [data]);
+  const maxTop = topExpenses[0]?.value || 1;
+  const totalTop = topExpenses.reduce((s, e) => s + e.value, 0);
+
+  return (
+    <>
+      <SectionHeader title="Статистика" />
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {[['week', 'Неделя'], ['month', 'Месяц'], ['year', 'Год']].map(([v, l]) => (
+          <FilterChip key={v} active={range === v} onClick={() => setRange(v)}>{l}</FilterChip>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+        <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 14 }}>
+          <p style={{ fontSize: 11, color: 'var(--text-soft)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>Доход</p>
+          <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--income)', margin: '4px 0 0', letterSpacing: -0.3 }}>+{fmt(data.inc)} {sym}</p>
+        </div>
+        <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 14 }}>
+          <p style={{ fontSize: 11, color: 'var(--text-soft)', margin: 0, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>Расход</p>
+          <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--expense)', margin: '4px 0 0', letterSpacing: -0.3 }}>−{fmt(data.exp)} {sym}</p>
+        </div>
+      </div>
+      <ChartCard title="Динамика">
+        <div style={{ height: 200, position: 'relative' }}><canvas ref={trendRef}></canvas></div>
+      </ChartCard>
+      <ChartCard title="По категориям">
+        <div style={{ height: 200, position: 'relative' }}><canvas ref={catRef}></canvas></div>
+      </ChartCard>
+      {topExpenses.length > 0 && (
+        <ChartCard title="Топ расходов">
+          {topExpenses.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: i < topExpenses.length - 1 ? '1px solid var(--border)' : 'none' }}>
+              <div style={{ fontSize: 18 }}>{e.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{e.name}</p>
+                <div style={{ height: 4, background: 'var(--bg-elev-2)', borderRadius: 2, marginTop: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: (e.value / maxTop * 100) + '%', background: 'var(--text)', borderRadius: 2 }} />
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{fmt(e.value)}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-soft)', fontWeight: 500, margin: '1px 0 0' }}>{(e.value / totalTop * 100).toFixed(0)}%</p>
+              </div>
+            </div>
+          ))}
+        </ChartCard>
+      )}
+    </>
+  );
+};
+
+const ChartCard = ({ title, children }) => (
+  <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 14, marginBottom: 12 }}>
+    <h4 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-soft)', textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 12px' }}>{title}</h4>
+    {children}
+  </div>
+);
+
+// =====================================================================
+// НАСТРОЙКИ
+// =====================================================================
+
+const SettingsView = ({ user, theme, setTheme, currency, onCurrency, onTheme, onCategories, onLogin, onLogout, onExport }) => {
+  const isLogged = user && !user.isGuest;
+  const initials = isLogged ? (user.displayName || user.email).trim().slice(0, 1).toUpperCase() : 'Г';
+
+  return (
+    <>
+      <SectionHeader title="Аккаунт" />
+      {isLogged ? (
+        <div style={{
+          background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 16,
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+        }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'var(--accent)', color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600,
+          }}>{initials}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{user.displayName || 'Пользователь'}</p>
+            <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</p>
+            <span style={{ fontSize: 10, color: 'var(--income)', background: 'var(--income-soft)', padding: '2px 8px', borderRadius: 10, display: 'inline-block', marginTop: 4, fontWeight: 500 }}>
+              Синхронизировано · {user.provider || 'email'}
+            </span>
+          </div>
+          <button onClick={onLogout} style={{ padding: '6px 12px', borderRadius: 8, background: 'var(--bg-elev-2)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 500 }}>
+            Выйти
+          </button>
+        </div>
+      ) : (
+        <button onClick={onLogin} style={{
+          background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, padding: 16,
+          display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', marginBottom: 16,
+          transition: 'border-color 0.15s',
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--border-strong)'}
+        onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'var(--bg-elev-2)', color: 'var(--text-soft)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+          }}><Icon name="user" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Гость</p>
+            <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0' }}>Войти для синхронизации</p>
+            <span style={{ fontSize: 10, color: 'var(--text-soft)', background: 'var(--bg-elev-2)', padding: '2px 8px', borderRadius: 10, display: 'inline-block', marginTop: 4, fontWeight: 500 }}>
+              Только на этом устройстве
+            </span>
+          </div>
+          <Icon name="chevron" size={18} />
+        </button>
+      )}
+
+      <SectionHeader title="Настройки" />
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 12 }}>
+        <SettingRow icon="currency" title="Валюта" sub={`${cur(currency).name} (${cur(currency).sym})`} onClick={onCurrency} />
+        <SettingRow icon={theme === 'dark' ? 'moon' : 'sun'} title="Тема" sub={theme === 'auto' ? 'Как в системе' : (theme === 'dark' ? 'Тёмная' : 'Светлая')} onClick={onTheme} />
+        <SettingRow icon="settings" title="Категории" sub="Свои и стандартные" onClick={onCategories} />
+        <SettingRow icon="download" title="Экспорт CSV" sub="Скачать все операции" onClick={onExport} last />
+      </div>
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 20 }}>
+        Финансы v2.0 · React
+      </p>
+    </>
+  );
+};
+
+const SettingRow = ({ icon, title, sub, onClick, last = false }) => (
+  <button onClick={onClick} style={{
+    display: 'flex', alignItems: 'center', gap: 12, padding: 14, width: '100%', textAlign: 'left',
+    borderBottom: last ? 'none' : '1px solid var(--border)', transition: 'background 0.15s',
+  }}
+  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elev-2)'}
+  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+    <div style={{
+      width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elev-2)', color: 'var(--text-soft)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}><Icon name={icon} size={18} /></div>
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: 'var(--text)' }}>{title}</p>
+      <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0' }}>{sub}</p>
+    </div>
+    <Icon name="chevron" size={16} />
+  </button>
+);
+
+// =====================================================================
+// ФОРМА ДОБАВЛЕНИЯ ТРАНЗАКЦИИ
+// =====================================================================
+
+const AddTransactionForm = ({ onSave, onClose, customCategories, currency }) => {
+  const [type, setType] = useState('expense');
+  const [amount, setAmount] = useState('');
+  const [categoryId, setCategoryId] = useState(null);
+  const [note, setNote] = useState('');
+  const [date, setDate] = useState(today());
+
+  const cats = getCatsByType(customCategories, type);
+
+  const handleSave = () => {
+    const a = parseFloat(amount);
+    if (!a || a <= 0) { alert('Введи сумму'); return; }
+    if (!categoryId) { alert('Выбери категорию'); return; }
+    onSave({ type, amount: a, categoryId, note: note.trim(), date });
+  };
+
+  return (
+    <div>
+      <Segmented
+        value={type}
+        onChange={(v) => { setType(v); setCategoryId(null); }}
+        options={[{ value: 'expense', label: 'Расход' }, { value: 'income', label: 'Доход' }]}
+      />
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        min="0"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="0"
+        autoFocus
+        style={{
+          width: '100%', fontSize: 40, fontWeight: 700, textAlign: 'center', letterSpacing: -1.5,
+          background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)',
+          padding: '16px 8px', color: 'var(--text)', marginTop: 20, outline: 'none',
+        }}
+      />
+      <div style={{ marginTop: 20 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '0 0 8px', fontWeight: 500 }}>Категория</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {cats.map(c => (
+            <button key={c.id} onClick={() => setCategoryId(c.id)} style={{
+              aspectRatio: '1', borderRadius: 10, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 11, fontWeight: 500,
+              background: categoryId === c.id ? 'var(--accent-soft)' : 'var(--bg-elev-2)',
+              color: categoryId === c.id ? 'var(--accent)' : 'var(--text)',
+              border: categoryId === c.id ? '1.5px solid var(--accent)' : '1.5px solid transparent',
+              transition: 'all 0.15s',
+            }}>
+              <span style={{ fontSize: 20 }}>{c.emoji}</span>
+              <span style={{ lineHeight: 1.1, textAlign: 'center', wordBreak: 'break-word', padding: '0 2px' }}>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <Input label="Описание" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Например: кофе с другом" />
+      <Input label="Дата" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <Btn variant="secondary" onClick={onClose}>Отмена</Btn>
+        <Btn variant="primary" onClick={handleSave}>Сохранить</Btn>
+      </div>
+    </div>
+  );
+};
+
+// =====================================================================
+// АВТОРИЗАЦИЯ
+// =====================================================================
+
+const AuthForm = ({ onLogin }) => {
+  const [mode, setMode] = useState('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError('');
+    if (!email || !password) { setError('Заполни все поля'); return; }
+    setLoading(true);
+    setTimeout(() => {
+      const users = JSON.parse(localStorage.getItem(LS.users) || '{}');
+      if (mode === 'signup') {
+        if (users[email]) { setError('Email уже зарегистрирован'); setLoading(false); return; }
+        users[email] = { name: name || email.split('@')[0], password: btoa(password), provider: 'email' };
+        localStorage.setItem(LS.users, JSON.stringify(users));
+        onLogin({ uid: btoa(email), email, displayName: users[email].name, isLocal: true, provider: 'email' });
+      } else {
+        if (!users[email] || users[email].password !== btoa(password)) { setError('Неверный email или пароль'); setLoading(false); return; }
+        onLogin({ uid: btoa(email), email, displayName: users[email].name, isLocal: true, provider: 'email' });
+      }
+      setLoading(false);
+    }, 400);
+  };
+
+  const handleGoogle = () => {
+    setLoading(true);
+    setError('');
+    setTimeout(() => {
+      const email = 'google.user@gmail.com';
+      const name = 'Google User';
+      const users = JSON.parse(localStorage.getItem(LS.users) || '{}');
+      if (!users[email]) {
+        users[email] = { name, password: btoa('google-' + uid()), provider: 'google' };
+        localStorage.setItem(LS.users, JSON.stringify(users));
+      }
+      onLogin({ uid: btoa(email), email, displayName: name, isLocal: true, provider: 'google' });
+      setLoading(false);
+    }, 600);
+  };
+
+  return (
+    <div>
+      <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, marginBottom: 16 }}>₽</div>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 4px', letterSpacing: -0.3 }}>{mode === 'signin' ? 'Вход' : 'Создать аккаунт'}</h2>
+      <p style={{ fontSize: 13, color: 'var(--text-soft)', margin: '0 0 18px' }}>Синхронизация между устройствами</p>
+      {error && <div style={{ background: 'var(--expense-soft)', color: 'var(--expense)', padding: '10px 12px', borderRadius: 10, fontSize: 13, marginBottom: 14 }}>{error}</div>}
+      <button onClick={handleGoogle} disabled={loading} style={{
+        width: '100%', background: 'var(--bg-elev-2)', border: '1px solid var(--border-strong)',
+        color: 'var(--text)', padding: 12, borderRadius: 10, fontSize: 14, fontWeight: 500,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12,
+        opacity: loading ? 0.5 : 1, transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+      onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-elev-2)'}>
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        {loading ? 'Открываю…' : 'Продолжить с Google'}
+      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '12px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        или по email
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+      </div>
+      <form onSubmit={handleSubmit}>
+        {mode === 'signup' && <Input label="Имя" value={name} onChange={(e) => setName(e.target.value)} placeholder="Как тебя зовут?" />}
+        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@mail.com" required />
+        <Input label="Пароль" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 6 символов" required minLength={6} />
+        <div style={{ marginTop: 8 }}>
+          <Btn variant="primary" type="submit" disabled={loading}>{mode === 'signin' ? 'Войти' : 'Создать'}</Btn>
+        </div>
+      </form>
+      <p style={{ textAlign: 'center', marginTop: 14, fontSize: 13, color: 'var(--text-soft)' }}>
+        {mode === 'signin' ? 'Нет аккаунта? ' : 'Уже есть? '}
+        <a onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(''); }} style={{ color: 'var(--accent)', fontWeight: 500, cursor: 'pointer' }}>
+          {mode === 'signin' ? 'Создать' : 'Войти'}
+        </a>
+      </p>
+    </div>
+  );
+};
+
+// =====================================================================
+// ВЫБОР ВАЛЮТЫ
+// =====================================================================
+
+const CurrencyList = ({ current, onChange }) => (
+  <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+    {CURRENCIES.map((c, i) => (
+      <button key={c.code} onClick={() => onChange(c.code)} style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: 14, width: '100%', textAlign: 'left',
+        borderBottom: i < CURRENCIES.length - 1 ? '1px solid var(--border)' : 'none', transition: 'background 0.15s',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elev-2)'}
+      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elev-2)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14 }}>{c.sym}</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{c.name}</p>
+          <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '2px 0 0' }}>{c.code}</p>
+        </div>
+        {c.code === current && <Icon name="check" size={20} stroke={2.2} />}
+      </button>
+    ))}
+  </div>
+);
+
+// =====================================================================
+// КАТЕГОРИИ (управление)
+// =====================================================================
+
+const CategoriesManager = ({ custom, onAdd, onRemove }) => {
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('');
+  const all = getAllCats(custom);
+  return (
+    <div>
+      <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden', marginBottom: 16, maxHeight: 280, overflowY: 'auto' }}>
+        {all.map((c, i) => (
+          <div key={c.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderBottom: i < all.length - 1 ? '1px solid var(--border)' : 'none',
+          }}>
+            <div style={{ fontSize: 18 }}>{c.emoji}</div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{c.name}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-soft)', margin: '2px 0 0' }}>{c.type === 'expense' ? 'Расход' : 'Доход'}{c.custom ? ' · своя' : ''}</p>
+            </div>
+            {c.custom ? (
+              <button onClick={() => onRemove(c.id)} style={{ padding: '4px 10px', borderRadius: 6, background: 'var(--expense-soft)', color: 'var(--expense)', fontSize: 12, fontWeight: 500 }}>Удалить</button>
+            ) : (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+            )}
+          </div>
+        ))}
+      </div>
+      <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: '0 0 6px', fontWeight: 500 }}>Новая категория</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Название" style={{
+          flex: 1, background: 'var(--bg-elev-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 12px', fontSize: 14, outline: 'none', color: 'var(--text)',
+        }} />
+        <input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="🛒" maxLength={2} style={{
+          width: 60, textAlign: 'center', background: 'var(--bg-elev-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 8px', fontSize: 16, outline: 'none', color: 'var(--text)',
+        }} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Btn variant="secondary" onClick={() => {
+          if (!name) { alert('Введи название'); return; }
+          onAdd({ name: name.slice(0, 20), emoji: emoji || '📌', type: 'expense' });
+          setName(''); setEmoji('');
+        }}>+ Расход</Btn>
+        <Btn variant="secondary" onClick={() => {
+          if (!name) { alert('Введи название'); return; }
+          onAdd({ name: name.slice(0, 20), emoji: emoji || '📌', type: 'income' });
+          setName(''); setEmoji('');
+        }}>+ Доход</Btn>
+      </div>
+    </div>
+  );
+};
+
+// =====================================================================
+// ДЕТАЛИ ОПЕРАЦИИ
+// =====================================================================
+
+const TransactionDetail = ({ tx, custom, currency, onDelete, onClose }) => {
+  const cat = findCat(custom, tx.categoryId) || { name: 'Без категории', emoji: '❓' };
+  const sym = cur(currency).sym;
+  const sign = tx.type === 'expense' ? '−' : '+';
+  const color = tx.type === 'expense' ? 'var(--expense)' : 'var(--income)';
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>{cat.emoji}</div>
+        <h2 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 4px', color, letterSpacing: -1 }}>{sign}{fmt(tx.amount)} {sym}</h2>
+        <p style={{ margin: 0, color: 'var(--text-soft)', fontSize: 13 }}>{cat.name} · {formatDateLong(tx.date)}</p>
+        {tx.note && <p style={{ margin: '14px 0 0', padding: 12, background: 'var(--bg-elev-2)', borderRadius: 10, fontSize: 13 }}>{tx.note}</p>}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Btn variant="danger" onClick={onDelete}>Удалить</Btn>
+        <Btn variant="secondary" onClick={onClose}>Закрыть</Btn>
+      </div>
+    </div>
+  );
+};
+
+// =====================================================================
+// ЭКСПОРТ
+// =====================================================================
+
+const exportCSV = (transactions, customCategories, currency, showToast) => {
+  if (!transactions.length) { showToast('Нечего экспортировать', 'error'); return; }
+  const rows = [['Дата', 'Тип', 'Категория', 'Сумма', 'Валюта', 'Описание']];
+  transactions.forEach(t => {
+    const cat = findCat(customCategories, t.categoryId);
+    rows.push([t.date, t.type === 'expense' ? 'Расход' : 'Доход', cat ? cat.name : '?', t.amount, currency, t.note || '']);
+  });
+  const csv = '\ufeff' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `финансы_${today()}.csv`;
+  a.click();
+  showToast('Файл скачан', 'success');
+};
+
+// =====================================================================
+// МОНТАЖ
+// =====================================================================
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
